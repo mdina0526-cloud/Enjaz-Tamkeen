@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+backend/src/SalesSystem.Api/App_Data/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
