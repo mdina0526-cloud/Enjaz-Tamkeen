@@ -5,6 +5,7 @@ obj/
 .vs/
 TestResults/
 backend/src/SalesSystem.Api/App_Data/
+backups/
 
 # Node
 node_modules/

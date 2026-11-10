@@ -10,7 +10,7 @@ namespace SalesSystem.Api.Controllers;
 /// <summary>Order types, service catalog and payment methods. Reading is open to signed-in users; changes are admin-only.</summary>
 [ApiController]
 [Route("api/catalog")]
-[Authorize(Roles = $"{RoleNames.SuperAdmin},{RoleNames.Employee}")]
+[Authorize(Roles = RoleNames.OrderStaff)]
 public class CatalogController(CatalogService catalog, ICurrentUser currentUser) : ControllerBase
 {
     /// <summary><c>includeInactive</c> is honoured for admins only.</summary>

@@ -5,7 +5,7 @@ import { ArrowRight, Ban, Banknote, CheckCircle2, CircleDollarSign, ClipboardLis
 import { api } from '@/lib/api'
 import { toastError, useApiQuery } from '@/hooks/useApi'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/lib/utils'
-import type { DeductionRule, EmployeeDetail, EmployeeStats, OrderListItem, PagedResult } from '@/types/api'
+import type { DeductionRule, EmployeeDetail, EmployeeStats, OrderListItem, PagedResult, Role } from '@/types/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -78,6 +78,19 @@ export function EmployeeDetailPage() {
               <div className="ms-auto">{e.isActive ? <Badge variant="success">نشط</Badge> : <Badge variant="muted">معطل</Badge>}</div>
             </div>
             <InfoRow label="الرقم الوظيفي"><span className="num">{e.employeeCode}</span></InfoRow>
+            <InfoRow label="الصلاحية">
+              <select className="rounded-md border bg-background px-2 py-1 text-sm" value={e.role} onChange={async (event) => {
+                try {
+                  const saved = await api.put<EmployeeDetail>(`/api/employees/${e.id}/role`, { role: event.target.value as Role })
+                  employee.setData(saved)
+                  toast.success('تم تحديث الصلاحية وإنهاء الجلسات القديمة')
+                } catch (err) { toastError(err) }
+              }}>
+                <option value="Employee">موظف</option>
+                <option value="OperationsManager">مدير عمليات</option>
+                <option value="Accountant">محاسب</option>
+              </select>
+            </InfoRow>
             <InfoRow label="البريد الإلكتروني"><span className="num">{e.email ?? '—'}</span></InfoRow>
             <InfoRow label="الجوال"><span className="num">{e.phone ?? '—'}</span></InfoRow>
             <InfoRow label="تاريخ التعيين">{formatDate(e.hireDate)}</InfoRow>

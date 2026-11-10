@@ -29,6 +29,26 @@ public class AuthController(AuthService auth) : ControllerBase
     [Authorize]
     public Task<UserInfoDto> UpdateMe(UpdateProfileRequest req, CancellationToken ct) => auth.UpdateProfileAsync(req, ct);
 
+    [HttpPost("mfa/setup")]
+    [Authorize]
+    public Task<MfaSetupDto> BeginMfa(BeginMfaRequest req, CancellationToken ct) => auth.BeginMfaAsync(req, ct);
+
+    [HttpPost("mfa/confirm")]
+    [Authorize]
+    public async Task<IActionResult> ConfirmMfa(ConfirmMfaRequest req, CancellationToken ct)
+    {
+        await auth.ConfirmMfaAsync(req, ct);
+        return NoContent();
+    }
+
+    [HttpPost("mfa/disable")]
+    [Authorize]
+    public async Task<IActionResult> DisableMfa(DisableMfaRequest req, CancellationToken ct)
+    {
+        await auth.DisableMfaAsync(req, ct);
+        return NoContent();
+    }
+
     [HttpPost("change-password")]
     [Authorize]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest req, CancellationToken ct)

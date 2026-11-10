@@ -15,6 +15,9 @@ public class User
     public string? Email { get; set; }
     public required string FullName { get; set; }
     public string PasswordHash { get; set; } = "";
+    public string? MfaSecretProtected { get; set; }
+    public bool MfaEnabled { get; set; }
+    public long? MfaLastUsedStep { get; set; }
     public int RoleId { get; set; }
     public Role Role { get; set; } = null!;
     public bool IsActive { get; set; } = true;
@@ -226,4 +229,19 @@ public class SystemSetting
     public required string Key { get; set; }
     public required string Value { get; set; }
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public class DailyClose
+{
+    public int Id { get; set; }
+    public DateOnly BusinessDate { get; set; }
+    public decimal ExpectedCash { get; set; }
+    public decimal ExpectedCard { get; set; }
+    public decimal CountedCash { get; set; }
+    public decimal CountedCard { get; set; }
+    public int OrdersCount { get; set; }
+    public int RentalPaymentsCount { get; set; }
+    public string? Notes { get; set; }
+    public int ClosedByUserId { get; set; }
+    public DateTime ClosedAtUtc { get; set; }
 }

@@ -9,7 +9,7 @@ import { invalidate, toastError, useOrderTypes, useServices } from '@/hooks/useA
 import type { OrderTypeItem, ServiceItem } from '@/types/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input, NativeSelect, Textarea } from '@/components/ui/input'
 import { Field, Label } from '@/components/ui/label'
@@ -23,8 +23,39 @@ export function CatalogSettings() {
     <div className="grid gap-6 xl:grid-cols-5">
       <div className="xl:col-span-2"><OrderTypesCard /></div>
       <div className="xl:col-span-3"><ServicesCard /></div>
+      <div className="xl:col-span-5"><ImportServicesCard /></div>
     </div>
   )
+}
+
+interface ImportPreview { rows: { row: number; name: string; action: string }[]; errors: string[] }
+function ImportServicesCard() {
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [busy, setBusy] = useState(false)
+  const send = async (apply: boolean) => {
+    if (!file) return
+    setBusy(true)
+    try {
+      const body = new FormData(); body.append('file', file)
+      const result = await api.post<ImportPreview>(`/api/import/services/${apply ? 'apply' : 'preview'}`, body)
+      setPreview(result)
+      if (apply) { await invalidate('catalog'); toast.success(`تم استيراد ${result.rows.length} خدمة`) }
+    } catch (e) { toastError(e) } finally { setBusy(false) }
+  }
+  return <Card>
+    <CardHeader><CardTitle>استيراد الخدمات الحقيقية</CardTitle><CardDescription>ارفع ملف Excel، راجع الصفوف والأخطاء، ثم احفظ. الخدمات الموجودة بنفس الاسم تُحدّث.</CardDescription></CardHeader>
+    <CardContent className="space-y-4">
+      <Button variant="outline" onClick={() => void api.download('/api/import/services/template', undefined, 'services-import-template.xlsx')}>تحميل نموذج Excel</Button>
+      <Input type="file" accept=".xlsx" onChange={e => { setFile(e.target.files?.[0] ?? null); setPreview(null) }} />
+      <Button variant="outline" disabled={!file || busy} loading={busy} onClick={() => void send(false)}>مراجعة الملف</Button>
+      {preview && <div className="space-y-2 text-sm">
+        <p>{preview.rows.length} صف · {preview.rows.filter(r => r.action === 'create').length} جديد · {preview.rows.filter(r => r.action === 'update').length} تحديث</p>
+        {preview.errors.map((e, i) => <p key={i} className="text-destructive">{e}</p>)}
+        {preview.errors.length === 0 && <Button disabled={busy} loading={busy} onClick={() => void send(true)}>تأكيد الاستيراد</Button>}
+      </div>}
+    </CardContent>
+  </Card>
 }
 
 function StatusBadge({ active }: { active: boolean }) {

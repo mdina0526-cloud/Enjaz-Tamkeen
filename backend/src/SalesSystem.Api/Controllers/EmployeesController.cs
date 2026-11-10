@@ -8,7 +8,7 @@ namespace SalesSystem.Api.Controllers;
 
 [ApiController]
 [Route("api/employees")]
-[Authorize(Roles = RoleNames.SuperAdmin)]
+[Authorize(Roles = RoleNames.Management)]
 public class EmployeesController(EmployeeService employees, OrderService orders) : ControllerBase
 {
     [HttpGet]
@@ -22,6 +22,7 @@ public class EmployeesController(EmployeeService employees, OrderService orders)
     public Task<EmployeeDetailDto> Get(int id, CancellationToken ct) => employees.GetAsync(id, ct);
 
     [HttpPost]
+    [Authorize(Roles = RoleNames.SuperAdmin)]
     public async Task<ActionResult<EmployeeDetailDto>> Create(CreateEmployeeRequest req, CancellationToken ct)
     {
         var e = await employees.CreateAsync(req, ct);
@@ -29,9 +30,15 @@ public class EmployeesController(EmployeeService employees, OrderService orders)
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = RoleNames.SuperAdmin)]
     public Task<EmployeeDetailDto> Update(int id, UpdateEmployeeRequest req, CancellationToken ct) => employees.UpdateAsync(id, req, ct);
 
+    [HttpPut("{id:int}/role")]
+    [Authorize(Roles = RoleNames.SuperAdmin)]
+    public Task<EmployeeDetailDto> SetRole(int id, SetEmployeeRoleRequest req, CancellationToken ct) => employees.SetRoleAsync(id, req.Role, ct);
+
     [HttpPost("{id:int}/status")]
+    [Authorize(Roles = RoleNames.SuperAdmin)]
     public async Task<IActionResult> SetStatus(int id, SetStatusRequest req, CancellationToken ct)
     {
         await employees.SetStatusAsync(id, req.IsActive, ct);
@@ -39,9 +46,11 @@ public class EmployeesController(EmployeeService employees, OrderService orders)
     }
 
     [HttpPost("{id:int}/login-link")]
+    [Authorize(Roles = RoleNames.SuperAdmin)]
     public Task<EmployeeDetailDto> RegenerateLoginLink(int id, CancellationToken ct) => employees.RegenerateLoginLinkAsync(id, ct);
 
     [HttpPost("{id:int}/reset-password")]
+    [Authorize(Roles = RoleNames.SuperAdmin)]
     public async Task<IActionResult> ResetPassword(int id, ResetPasswordRequest req, CancellationToken ct)
     {
         await employees.ResetPasswordAsync(id, req.NewPassword, ct);
@@ -49,6 +58,7 @@ public class EmployeesController(EmployeeService employees, OrderService orders)
     }
 
     [HttpPut("{id:int}/deduction")]
+    [Authorize(Roles = RoleNames.SuperAdmin)]
     public async Task<IActionResult> SetDeduction(int id, SetDeductionRequest req, CancellationToken ct)
     {
         await employees.SetDeductionAsync(id, req, ct);

@@ -33,6 +33,7 @@ public class DbSeeder(AppDbContext db, PasswordService passwords, IOptions<SeedO
             logger.LogWarning("Seed:AdminPassword not set. Generated a one-time development password for '{User}': {Password}  (change it after first login)",
                 _opt.AdminUsername, password);
         }
+        PasswordService.EnsureStrong(password);
 
         var admin = new User
         {

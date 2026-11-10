@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<RentalPayment> RentalPayments => Set<RentalPayment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<DailyClose> DailyCloses => Set<DailyClose>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -46,7 +47,9 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.Name).IsUnique();
             e.HasData(
                 new Role { Id = 1, Name = RoleNames.SuperAdmin, DisplayName = "المدير العام" },
-                new Role { Id = 2, Name = RoleNames.Employee, DisplayName = "موظف" });
+                new Role { Id = 2, Name = RoleNames.Employee, DisplayName = "موظف" },
+                new Role { Id = 3, Name = RoleNames.OperationsManager, DisplayName = "مدير العمليات" },
+                new Role { Id = 4, Name = RoleNames.Accountant, DisplayName = "محاسب" });
         });
 
         b.Entity<User>(e =>
@@ -54,6 +57,7 @@ public class AppDbContext : DbContext
             e.Property(x => x.Username).HasMaxLength(64);
             e.Property(x => x.FullName).HasMaxLength(150);
             e.Property(x => x.PasswordHash).HasMaxLength(512);
+            e.Property(x => x.MfaSecretProtected).HasMaxLength(1024);
             e.Property(x => x.SecurityStamp).HasMaxLength(64);
             e.HasIndex(x => x.Username).IsUnique();
             e.HasIndex(x => x.Email).IsUnique().HasFilter("\"Email\" IS NOT NULL");
@@ -231,6 +235,13 @@ public class AppDbContext : DbContext
             e.HasKey(x => x.Key);
             e.Property(x => x.Key).HasMaxLength(100);
             e.Property(x => x.Value).HasMaxLength(1000);
+        });
+
+        b.Entity<DailyClose>(e =>
+        {
+            e.HasIndex(x => x.BusinessDate).IsUnique();
+            e.Property(x => x.Notes).HasMaxLength(1000);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.ClosedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

@@ -8,6 +8,8 @@ public class AppOptions
     public string Currency { get; set; } = "ر.س";
     public string CompanyName { get; set; } = "نظام إدارة المبيعات";
     public string[] CorsOrigins { get; set; } = ["http://localhost:5173"];
+    /// <summary>Address of the only reverse proxy allowed to supply forwarded client IP and scheme headers.</summary>
+    public string? TrustedProxyIp { get; set; }
 }
 
 public class StorageOptions

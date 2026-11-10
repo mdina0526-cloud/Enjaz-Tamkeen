@@ -14,9 +14,10 @@ import { Field } from '@/components/ui/label'
 import { Logo } from '@/components/Logo'
 
 const password = z.string().min(1, 'يرجى إدخال كلمة المرور').max(128)
-const schema = z.object({ username: z.string().trim().min(1, 'يرجى إدخال اسم المستخدم أو البريد الإلكتروني').max(150), password })
+const mfaCode = z.union([z.literal(''), z.string().regex(/^\d{6}$/, 'أدخل رمز التحقق المكون من 6 أرقام')]).optional()
+const schema = z.object({ username: z.string().trim().min(1, 'يرجى إدخال اسم المستخدم أو البريد الإلكتروني').max(150), password, mfaCode })
 // On a personal link the link itself identifies the employee, so only the password is asked for.
-const portalSchema = z.object({ username: z.string().optional(), password })
+const portalSchema = z.object({ username: z.string().optional(), password, mfaCode })
 type FormValues = z.infer<typeof portalSchema>
 
 /** Personal login page of one employee (/e/:slug). Only that employee can sign in here. */
@@ -48,6 +49,7 @@ export function LoginPage({ portal }: { portal?: LoginPortal & { slug: string } 
   const location = useLocation()
   const [showPassword, setShowPassword] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [needsMfa, setNeedsMfa] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({ resolver: zodResolver(portal ? portalSchema : schema) })
 
   if (user) return <Navigate to="/" replace />
@@ -55,11 +57,13 @@ export function LoginPage({ portal }: { portal?: LoginPortal & { slug: string } 
   const onSubmit = async (v: FormValues) => {
     setServerError(null)
     try {
-      await login(v.username ?? '', v.password, portal?.slug)
+      await login(v.username ?? '', v.password, portal?.slug, v.mfaCode || undefined)
       const from = (location.state as { from?: string } | null)?.from
       navigate(from && from !== '/login' ? from : '/', { replace: true })
     } catch (e) {
-      setServerError(errorMessage(e))
+      const message = errorMessage(e)
+      if (message.includes('رمز التحقق')) setNeedsMfa(true)
+      setServerError(message)
     }
   }
 
@@ -122,6 +126,12 @@ export function LoginPage({ portal }: { portal?: LoginPortal & { slug: string } 
                 </button>
               </div>
             </Field>
+
+            {needsMfa && (
+              <Field label="رمز التحقق بخطوتين" htmlFor="mfaCode" error={errors.mfaCode?.message}>
+                <Input id="mfaCode" inputMode="numeric" autoComplete="one-time-code" maxLength={6} dir="ltr" placeholder="000000" {...register('mfaCode')} />
+              </Field>
+            )}
 
             <Button type="submit" size="lg" className="h-12 w-full bg-gradient-to-l from-primary to-navy-2 text-base shadow-lg shadow-primary/25 hover:opacity-95" loading={isSubmitting}>
               تسجيل الدخول

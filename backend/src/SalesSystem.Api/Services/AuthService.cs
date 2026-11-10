@@ -27,7 +27,7 @@ public class PasswordService
     }
 }
 
-public class AuthService(AppDbContext db, PasswordService passwords, TokenService tokens, AuditService audit, BusinessClock clock, ICurrentUser currentUser)
+public class AuthService(AppDbContext db, PasswordService passwords, TokenService tokens, TotpService totp, AuditService audit, BusinessClock clock, ICurrentUser currentUser)
 {
     public const int MaxFailedAttempts = 5;
     public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
@@ -80,6 +80,25 @@ public class AuthService(AppDbContext db, PasswordService passwords, TokenServic
         if (!user.IsActive)
             throw new AppException(StatusCodes.Status403Forbidden, "هذا الحساب معطل. تواصل مع المدير");
 
+        if (user.MfaEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(req.MfaCode))
+                throw new AppException(StatusCodes.Status401Unauthorized, "رمز التحقق مطلوب");
+            if (!totp.TryVerify(user.MfaSecretProtected, req.MfaCode, user.MfaLastUsedStep, out var usedStep))
+            {
+                user.FailedLoginCount++;
+                if (user.FailedLoginCount >= MaxFailedAttempts)
+                {
+                    user.LockoutEndUtc = now.Add(LockoutDuration);
+                    user.FailedLoginCount = 0;
+                }
+                audit.Add(AuditActions.LoginFailed, "User", user.Id, userId: user.Id, username: user.Username);
+                await db.SaveChangesAsync(ct);
+                throw new AppException(StatusCodes.Status401Unauthorized, "رمز التحقق غير صحيح");
+            }
+            user.MfaLastUsedStep = usedStep;
+        }
+
         if (needsRehash) user.PasswordHash = passwords.Hash(user, req.Password);
         user.FailedLoginCount = 0;
         user.LockoutEndUtc = null;
@@ -127,6 +146,45 @@ public class AuthService(AppDbContext db, PasswordService passwords, TokenServic
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task<MfaSetupDto> BeginMfaAsync(BeginMfaRequest req, CancellationToken ct)
+    {
+        var user = await db.Users.FirstAsync(u => u.Id == currentUser.UserId, ct);
+        if (user.MfaEnabled) throw AppException.BadRequest("التحقق بخطوتين مفعّل بالفعل");
+        if (!passwords.Verify(user, req.CurrentPassword, out _)) throw AppException.BadRequest("كلمة المرور الحالية غير صحيحة");
+        var (secret, protectedSecret) = totp.NewSecret();
+        user.MfaSecretProtected = protectedSecret;
+        await db.SaveChangesAsync(ct);
+        return new MfaSetupDto(secret, TotpService.EnrollmentUri(user.Username, secret));
+    }
+
+    public async Task ConfirmMfaAsync(ConfirmMfaRequest req, CancellationToken ct)
+    {
+        var user = await db.Users.FirstAsync(u => u.Id == currentUser.UserId, ct);
+        if (user.MfaEnabled || user.MfaSecretProtected is null) throw AppException.BadRequest("ابدأ إعداد التحقق بخطوتين أولاً");
+        if (!totp.TryVerify(user.MfaSecretProtected, req.Code, null, out var usedStep))
+            throw AppException.BadRequest("رمز التحقق غير صحيح");
+        user.MfaEnabled = true;
+        user.MfaLastUsedStep = usedStep;
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        audit.Add(AuditActions.Update, "UserMfa", user.Id, new { enabled = true });
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task DisableMfaAsync(DisableMfaRequest req, CancellationToken ct)
+    {
+        var user = await db.Users.FirstAsync(u => u.Id == currentUser.UserId, ct);
+        if (!user.MfaEnabled) return;
+        if (!passwords.Verify(user, req.CurrentPassword, out _)) throw AppException.BadRequest("كلمة المرور الحالية غير صحيحة");
+        if (!totp.TryVerify(user.MfaSecretProtected, req.Code, user.MfaLastUsedStep, out _))
+            throw AppException.BadRequest("رمز التحقق غير صحيح");
+        user.MfaSecretProtected = null;
+        user.MfaEnabled = false;
+        user.MfaLastUsedStep = null;
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        audit.Add(AuditActions.Update, "UserMfa", user.Id, new { enabled = false });
+        await db.SaveChangesAsync(ct);
+    }
+
     private static UserInfoDto ToInfo(User u) => new(
-        u.Id, u.Username, u.FullName, u.Email, u.Employee?.Phone, u.Role.Name, u.Employee?.Id, u.Employee?.EmployeeCode, u.Employee?.JobTitle, u.LastLoginAtUtc);
+        u.Id, u.Username, u.FullName, u.Email, u.Employee?.Phone, u.Role.Name, u.Employee?.Id, u.Employee?.EmployeeCode, u.Employee?.JobTitle, u.LastLoginAtUtc, u.MfaEnabled);
 }

@@ -32,7 +32,7 @@ public class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentUser
 
     public string Username => Principal?.FindFirstValue(ClaimTypes.Name) ?? "";
 
-    public bool IsAdmin => Principal?.IsInRole(RoleNames.SuperAdmin) == true;
+    public bool IsAdmin => Principal?.IsInRole(RoleNames.SuperAdmin) == true || Principal?.IsInRole(RoleNames.OperationsManager) == true;
 
     public int? EmployeeId => int.TryParse(Principal?.FindFirstValue(AppClaims.EmployeeId), out var id) ? id : null;
 

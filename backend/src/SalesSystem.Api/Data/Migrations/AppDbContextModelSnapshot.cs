@@ -73,6 +73,59 @@ namespace SalesSystem.Api.Data.Migrations
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("SalesSystem.Api.Domain.DailyClose", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ClosedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("CountedCard")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("CountedCash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ExpectedCard")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ExpectedCash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("OrdersCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RentalPaymentsCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessDate")
+                        .IsUnique();
+
+                    b.HasIndex("ClosedByUserId");
+
+                    b.ToTable("DailyCloses");
+                });
+
             modelBuilder.Entity("SalesSystem.Api.Domain.DeductionRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -532,6 +585,18 @@ namespace SalesSystem.Api.Data.Migrations
                             Id = 2,
                             DisplayName = "موظف",
                             Name = "Employee"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            DisplayName = "مدير العمليات",
+                            Name = "OperationsManager"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            DisplayName = "محاسب",
+                            Name = "Accountant"
                         });
                 });
 
@@ -810,6 +875,16 @@ namespace SalesSystem.Api.Data.Migrations
                     b.Property<DateTime?>("LockoutEndUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("MfaEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("MfaLastUsedStep")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MfaSecretProtected")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -840,6 +915,15 @@ namespace SalesSystem.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("SalesSystem.Api.Domain.DailyClose", b =>
+                {
+                    b.HasOne("SalesSystem.Api.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ClosedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SalesSystem.Api.Domain.DeductionRecord", b =>

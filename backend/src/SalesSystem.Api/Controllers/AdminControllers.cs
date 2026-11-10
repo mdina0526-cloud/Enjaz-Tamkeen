@@ -15,17 +15,17 @@ namespace SalesSystem.Api.Controllers;
 public class DashboardController(DashboardService dashboard) : ControllerBase
 {
     [HttpGet("admin")]
-    [Authorize(Roles = RoleNames.SuperAdmin)]
+    [Authorize(Roles = RoleNames.Management)]
     public Task<AdminDashboardDto> Admin([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken ct) => dashboard.AdminAsync(from, to, ct);
 
     [HttpGet("employee")]
-    [Authorize(Roles = RoleNames.Employee)]
+    [Authorize(Roles = $"{RoleNames.Employee},{RoleNames.Accountant}")]
     public Task<EmployeeDashboardDto> Employee(CancellationToken ct) => dashboard.EmployeeAsync(ct);
 }
 
 [ApiController]
 [Route("api/reports")]
-[Authorize(Roles = RoleNames.SuperAdmin)]
+[Authorize(Roles = RoleNames.Finance)]
 public class ReportsController(ReportService reports, ReportExporter exporter, AuditService audit, AppDbContext db) : ControllerBase
 {
     [HttpGet("{type}")]

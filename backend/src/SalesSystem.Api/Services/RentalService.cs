@@ -6,7 +6,7 @@ using SalesSystem.Api.Infrastructure;
 
 namespace SalesSystem.Api.Services;
 
-public class RentalService(AppDbContext db, AuditService audit, BusinessClock clock, ICurrentUser currentUser, FileStorage storage)
+public class RentalService(AppDbContext db, AuditService audit, BusinessClock clock, ICurrentUser currentUser, FileStorage storage, DailyCloseService dailyClose)
 {
     private record RentalRow(Rental Rental, decimal Paid, int PaymentsCount);
 
@@ -121,6 +121,7 @@ public class RentalService(AppDbContext db, AuditService audit, BusinessClock cl
             return (await GetAsync(rentalId, ct), true);
 
         if (req.PaidOn > clock.Today) throw AppException.BadRequest("لا يمكن أن يكون تاريخ السداد في المستقبل");
+        await dailyClose.EnsureOpenAsync(req.PaidOn, ct);
         if (!Enum.IsDefined(req.Method)) throw AppException.BadRequest("طريقة الدفع غير صالحة");
 
         (string StoredName, string ContentType)? file = req.Attachment is null ? null : await storage.SaveAsync(req.Attachment, ct);
@@ -177,6 +178,7 @@ public class RentalService(AppDbContext db, AuditService audit, BusinessClock cl
         var p = await db.RentalPayments.FirstOrDefaultAsync(x => x.Id == paymentId && x.RentalId == rentalId, ct)
                 ?? throw AppException.NotFound("الدفعة غير موجودة");
         if (p.IsVoided) throw AppException.Conflict("الدفعة ملغاة مسبقاً");
+        await dailyClose.EnsureOpenAsync(p.PaidOn, ct);
         p.IsVoided = true;
         p.VoidReason = reason.Trim();
         p.VoidedAtUtc = clock.UtcNow;

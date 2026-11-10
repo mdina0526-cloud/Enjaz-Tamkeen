@@ -7,7 +7,7 @@ interface AuthState {
   user: UserInfo | null
   loading: boolean
   isAdmin: boolean
-  login: (username: string, password: string, portal?: string) => Promise<UserInfo>
+  login: (username: string, password: string, portal?: string, mfaCode?: string) => Promise<UserInfo>
   /** Logs out and returns where to send the user: their personal login page if they came through one. */
   logout: () => string
   refresh: () => Promise<void>
@@ -66,8 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().finally(() => setLoading(false))
   }, [logout, refresh])
 
-  const login = useCallback(async (username: string, password: string, portal?: string) => {
-    const res = await api.post<LoginResponse>('/api/auth/login', portal ? { portal, password } : { username, password })
+  const login = useCallback(async (username: string, password: string, portal?: string, mfaCode?: string) => {
+    const res = await api.post<LoginResponse>('/api/auth/login', portal ? { portal, password, mfaCode } : { username, password, mfaCode })
     queryClient.clear()
     tokenStore.set(res.token)
     portalStore.set(portal ?? null)
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.user
   }, [])
 
-  const value = useMemo(() => ({ user, loading, isAdmin: user?.role === 'SuperAdmin', login, logout, refresh }), [user, loading, login, logout, refresh])
+  const value = useMemo(() => ({ user, loading, isAdmin: user?.role === 'SuperAdmin' || user?.role === 'OperationsManager', login, logout, refresh }), [user, loading, login, logout, refresh])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

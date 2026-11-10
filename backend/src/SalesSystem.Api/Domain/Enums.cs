@@ -4,6 +4,12 @@ public static class RoleNames
 {
     public const string SuperAdmin = "SuperAdmin";
     public const string Employee = "Employee";
+    public const string OperationsManager = "OperationsManager";
+    public const string Accountant = "Accountant";
+    public const string OrderStaff = $"{SuperAdmin},{OperationsManager},{Employee}";
+    public const string Management = $"{SuperAdmin},{OperationsManager}";
+    public const string Finance = $"{SuperAdmin},{Accountant}";
+    public const string RentalStaff = $"{SuperAdmin},{OperationsManager},{Accountant}";
 }
 
 public enum OrderStatus

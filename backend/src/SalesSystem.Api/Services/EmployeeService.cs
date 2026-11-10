@@ -23,7 +23,7 @@ public class EmployeeService(AppDbContext db, PasswordService passwords, AuditSe
                 e.DeductionRules.Where(r => r.EffectiveToUtc == null).Select(r => r.Percentage).FirstOrDefault(),
                 e.SalesOrders.Count(o => o.Status != OrderStatus.Cancelled),
                 e.SalesOrders.Where(o => o.Status != OrderStatus.Cancelled).Sum(o => (decimal?)o.Subtotal) ?? 0,
-                e.User.LastLoginAtUtc, e.CreatedAtUtc))
+                e.User.LastLoginAtUtc, e.CreatedAtUtc, e.User.Role.Name))
             .ToListAsync(ct);
     }
 
@@ -34,7 +34,7 @@ public class EmployeeService(AppDbContext db, PasswordService passwords, AuditSe
 
     public async Task<EmployeeDetailDto> GetAsync(int id, CancellationToken ct)
     {
-        var e = await db.Employees.AsNoTracking().Include(x => x.User)
+        var e = await db.Employees.AsNoTracking().Include(x => x.User).ThenInclude(u => u.Role)
             .FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound("الموظف غير موجود");
         return ToDetail(e, await CurrentPercentageAsync(id, ct));
     }
@@ -53,7 +53,7 @@ public class EmployeeService(AppDbContext db, PasswordService passwords, AuditSe
             Username = username,
             FullName = req.FullName.Trim(),
             Email = email,
-            RoleId = await db.Roles.Where(r => r.Name == RoleNames.Employee).Select(r => r.Id).FirstAsync(ct),
+            Role = await db.Roles.SingleAsync(r => r.Name == RoleNames.Employee, ct),
             CreatedAtUtc = clock.UtcNow,
         };
         user.PasswordHash = passwords.Hash(user, req.Password);
@@ -131,6 +131,9 @@ public class EmployeeService(AppDbContext db, PasswordService passwords, AuditSe
         e.User.SecurityStamp = Guid.NewGuid().ToString("N");
         e.User.FailedLoginCount = 0;
         e.User.LockoutEndUtc = null;
+        e.User.MfaEnabled = false;
+        e.User.MfaSecretProtected = null;
+        e.User.MfaLastUsedStep = null;
         audit.Add(AuditActions.ResetPassword, "Employee", e.Id);
         await db.SaveChangesAsync(ct);
     }
@@ -191,8 +194,22 @@ public class EmployeeService(AppDbContext db, PasswordService passwords, AuditSe
         await db.EmployeeDeductionRules.Where(r => r.EmployeeId == employeeId && r.EffectiveToUtc == null)
             .Select(r => (decimal?)r.Percentage).FirstOrDefaultAsync(ct) ?? 0;
 
+    public async Task<EmployeeDetailDto> SetRoleAsync(int id, string role, CancellationToken ct)
+    {
+        if (role is not (RoleNames.Employee or RoleNames.OperationsManager or RoleNames.Accountant))
+            throw AppException.BadRequest("الدور غير صالح");
+        var employee = await LoadAsync(id, ct);
+        var before = employee.User.Role.Name;
+        employee.User.RoleId = await db.Roles.Where(r => r.Name == role).Select(r => r.Id).SingleAsync(ct);
+        employee.User.Role = await db.Roles.SingleAsync(r => r.Id == employee.User.RoleId, ct);
+        employee.User.SecurityStamp = Guid.NewGuid().ToString("N");
+        audit.Add(AuditActions.Update, "EmployeeRole", id, new { before, after = role });
+        await db.SaveChangesAsync(ct);
+        return ToDetail(employee, await CurrentPercentageAsync(id, ct));
+    }
+
     private async Task<Employee> LoadAsync(int id, CancellationToken ct) =>
-        await db.Employees.Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound("الموظف غير موجود");
+        await db.Employees.Include(x => x.User).ThenInclude(u => u.Role).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw AppException.NotFound("الموظف غير موجود");
 
     private async Task EnsureUniqueAsync(string? username, string? email, int? exceptUserId, CancellationToken ct)
     {
@@ -212,5 +229,5 @@ public class EmployeeService(AppDbContext db, PasswordService passwords, AuditSe
 
     private static EmployeeDetailDto ToDetail(Employee e, decimal pct) => new(
         e.Id, e.UserId, e.EmployeeCode, e.User.FullName, e.User.Username, e.User.Email, e.Phone, e.JobTitle, e.HireDate,
-        e.User.IsActive, pct, e.User.LastLoginAtUtc, e.CreatedAtUtc, e.LoginSlug);
+        e.User.IsActive, pct, e.User.LastLoginAtUtc, e.CreatedAtUtc, e.LoginSlug, e.User.Role.Name);
 }

@@ -23,6 +23,7 @@ import { AuditLogsPage } from '@/pages/AuditLogsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { SalesPage } from '@/pages/SalesPage'
+import { DailyClosePage } from '@/pages/DailyClosePage'
 
 function RequireAuth() {
   const { user, loading } = useAuth()
@@ -38,9 +39,9 @@ function RequireAuth() {
 }
 
 /** UI guard only; every admin endpoint is also protected by role checks on the server. */
-function RequireAdmin() {
-  const { isAdmin } = useAuth()
-  return isAdmin ? <Outlet /> : <Navigate to="/" replace />
+function RequireRole({ roles }: { roles: string[] }) {
+  const { user } = useAuth()
+  return user && roles.includes(user.role) ? <Outlet /> : <Navigate to="/" replace />
 }
 
 function NotFound() {
@@ -72,17 +73,28 @@ export default function App() {
               <Route element={<RequireAuth />}>
                 <Route element={<AppLayout />}>
                   <Route index element={<DashboardPage />} />
-                  <Route path="orders" element={<OrdersPage />} />
-                  <Route path="orders/new" element={<NewOrderPage />} />
-                  <Route path="orders/:id" element={<OrderDetailPage />} />
                   <Route path="profile" element={<ProfilePage />} />
-                  <Route element={<RequireAdmin />}>
+                  <Route element={<RequireRole roles={['SuperAdmin', 'OperationsManager', 'Employee']} />}>
+                    <Route path="orders" element={<OrdersPage />} />
+                    <Route path="orders/new" element={<NewOrderPage />} />
+                    <Route path="orders/:id" element={<OrderDetailPage />} />
+                  </Route>
+                  <Route element={<RequireRole roles={['SuperAdmin', 'OperationsManager']} />}>
                     <Route path="sales" element={<SalesPage />} />
+                  </Route>
+                  <Route element={<RequireRole roles={['SuperAdmin']} />}>
                     <Route path="employees" element={<EmployeesPage />} />
                     <Route path="employees/:id" element={<EmployeeDetailPage />} />
+                  </Route>
+                  <Route element={<RequireRole roles={['SuperAdmin', 'OperationsManager', 'Accountant']} />}>
                     <Route path="rentals" element={<RentalsPage />} />
                     <Route path="rentals/:id" element={<RentalDetailPage />} />
+                  </Route>
+                  <Route element={<RequireRole roles={['SuperAdmin', 'Accountant']} />}>
                     <Route path="reports" element={<ReportsPage />} />
+                    <Route path="daily-close" element={<DailyClosePage />} />
+                  </Route>
+                  <Route element={<RequireRole roles={['SuperAdmin']} />}>
                     <Route path="audit-logs" element={<AuditLogsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                   </Route>

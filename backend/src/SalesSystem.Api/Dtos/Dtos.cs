@@ -14,14 +14,20 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int Pa
 public record LoginRequest(
     [MaxLength(150)] string? Username,
     [Required(ErrorMessage = "كلمة المرور مطلوبة"), MaxLength(128)] string Password,
-    [MaxLength(32)] string? Portal = null);
+    [MaxLength(32)] string? Portal = null,
+    [MaxLength(6)] string? MfaCode = null);
 
 /// <summary>Public info shown on an employee's personal login page.</summary>
 public record LoginPortalDto(string FullName, string? JobTitle);
 
 public record UserInfoDto(
     int Id, string Username, string FullName, string? Email, string? Phone, string Role, int? EmployeeId, string? EmployeeCode, string? JobTitle,
-    DateTime? LastLoginAtUtc);
+    DateTime? LastLoginAtUtc, bool MfaEnabled);
+
+public record BeginMfaRequest([Required] string CurrentPassword);
+public record ConfirmMfaRequest([Required] string Code);
+public record DisableMfaRequest([Required] string CurrentPassword, [Required] string Code);
+public record MfaSetupDto(string Secret, string EnrollmentUri);
 
 /// <summary>Fields a user may change on their own account. Name, role, username and deduction rate stay admin-only.</summary>
 public record UpdateProfileRequest
@@ -40,11 +46,13 @@ public record ChangePasswordRequest(
 
 public record EmployeeListItemDto(
     int Id, int UserId, string EmployeeCode, string FullName, string Username, string? Email, string? Phone, string? JobTitle,
-    bool IsActive, decimal DeductionPercentage, int OrdersCount, decimal TotalSales, DateTime? LastLoginAtUtc, DateTime CreatedAtUtc);
+    bool IsActive, decimal DeductionPercentage, int OrdersCount, decimal TotalSales, DateTime? LastLoginAtUtc, DateTime CreatedAtUtc, string Role);
 
 public record EmployeeDetailDto(
     int Id, int UserId, string EmployeeCode, string FullName, string Username, string? Email, string? Phone, string? JobTitle,
-    DateOnly? HireDate, bool IsActive, decimal DeductionPercentage, DateTime? LastLoginAtUtc, DateTime CreatedAtUtc, string? LoginSlug);
+    DateOnly? HireDate, bool IsActive, decimal DeductionPercentage, DateTime? LastLoginAtUtc, DateTime CreatedAtUtc, string? LoginSlug, string Role);
+
+public record SetEmployeeRoleRequest([Required] string Role);
 
 public record CreateEmployeeRequest
 {

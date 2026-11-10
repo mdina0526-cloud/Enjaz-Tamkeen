@@ -9,10 +9,11 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, './src') },
   },
   server: {
+    host: '127.0.0.1',
     port: 5173,
     proxy: {
       // During development the API runs on :5224; same-origin proxy avoids CORS.
-      '/api': { target: process.env.VITE_API_PROXY ?? 'http://localhost:5224', changeOrigin: true },
+      '/api': { target: process.env.VITE_API_PROXY ?? 'http://127.0.0.1:5224', changeOrigin: true },
     },
   },
   build: {

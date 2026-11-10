@@ -66,6 +66,57 @@ namespace SalesSystem.Api.Data.SqliteMigrations
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("SalesSystem.Api.Domain.DailyClose", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ClosedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ClosedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("CountedCard")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("CountedCash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ExpectedCard")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ExpectedCash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OrdersCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RentalPaymentsCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessDate")
+                        .IsUnique();
+
+                    b.HasIndex("ClosedByUserId");
+
+                    b.ToTable("DailyCloses");
+                });
+
             modelBuilder.Entity("SalesSystem.Api.Domain.DeductionRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -509,6 +560,18 @@ namespace SalesSystem.Api.Data.SqliteMigrations
                             Id = 2,
                             DisplayName = "موظف",
                             Name = "Employee"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            DisplayName = "مدير العمليات",
+                            Name = "OperationsManager"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            DisplayName = "محاسب",
+                            Name = "Accountant"
                         });
                 });
 
@@ -779,6 +842,16 @@ namespace SalesSystem.Api.Data.SqliteMigrations
                     b.Property<DateTime?>("LockoutEndUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("MfaEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("MfaLastUsedStep")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MfaSecretProtected")
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -809,6 +882,15 @@ namespace SalesSystem.Api.Data.SqliteMigrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("SalesSystem.Api.Domain.DailyClose", b =>
+                {
+                    b.HasOne("SalesSystem.Api.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ClosedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SalesSystem.Api.Domain.DeductionRecord", b =>

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,7 +8,7 @@ import { api } from '@/lib/api'
 import { invalidate, toastError, useApiQuery } from '@/hooks/useApi'
 import { useAuth } from '@/context/AuthContext'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/utils'
-import type { EmployeeDashboard, UserInfo } from '@/types/api'
+import type { EmployeeDashboard, MfaSetup, UserInfo } from '@/types/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +31,59 @@ const contactSchema = z.object({
   phone: z.string().trim().max(32, 'الحد الأقصى 32 رقماً').regex(/^[0-9+\-\s]*$/, 'رقم الهاتف غير صالح'),
 })
 type ContactValues = z.infer<typeof contactSchema>
+
+function MfaCard() {
+  const { user, refresh, logout } = useAuth()
+  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const [setup, setSetup] = useState<MfaSetup | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const begin = async () => {
+    setBusy(true)
+    try {
+      setSetup(await api.post<MfaSetup>('/api/auth/mfa/setup', { currentPassword: password }))
+      setPassword('')
+    } catch (e) { toastError(e) } finally { setBusy(false) }
+  }
+  const confirm = async () => {
+    setBusy(true)
+    try {
+      await api.post('/api/auth/mfa/confirm', { code })
+      setSetup(null); setCode('')
+      await refresh()
+      toast.success('تم تفعيل التحقق بخطوتين')
+      logout()
+    } catch (e) { toastError(e) } finally { setBusy(false) }
+  }
+  const disable = async () => {
+    setBusy(true)
+    try {
+      await api.post('/api/auth/mfa/disable', { currentPassword: password, code })
+      setPassword(''); setCode('')
+      toast.success('تم إيقاف التحقق بخطوتين')
+      logout()
+    } catch (e) { toastError(e) } finally { setBusy(false) }
+  }
+
+  return <Card>
+    <CardHeader>
+      <CardTitle>التحقق بخطوتين</CardTitle>
+      <CardDescription>{user?.mfaEnabled ? 'الحساب محمي برمز من تطبيق المصادقة.' : 'أضف رمزاً من تطبيق المصادقة لحماية حسابك.'}</CardDescription>
+    </CardHeader>
+    <CardContent className="grid max-w-xl gap-4">
+      {!setup && <Field label="كلمة المرور الحالية"><Input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} /></Field>}
+      {setup && <div className="rounded-lg bg-muted p-4 text-sm">
+        <p>أضف الحساب في تطبيق المصادقة باستخدام المفتاح التالي، ثم أدخل الرمز لتأكيد التفعيل.</p>
+        <p className="mt-2 select-all break-all font-mono" dir="ltr">{setup.secret}</p>
+      </div>}
+      {(setup || user?.mfaEnabled) && <Field label="رمز التطبيق المكون من 6 أرقام"><Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} dir="ltr" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} /></Field>}
+      <div><Button type="button" loading={busy} disabled={busy || (setup ? code.length !== 6 : user?.mfaEnabled ? !password || code.length !== 6 : !password)} onClick={setup ? confirm : user?.mfaEnabled ? disable : begin}>
+        {setup ? 'تأكيد التفعيل' : user?.mfaEnabled ? 'إيقاف التحقق بخطوتين' : 'بدء الإعداد'}
+      </Button></div>
+    </CardContent>
+  </Card>
+}
 
 /** Only contact details are self-service; name, role and deduction rate are managed by the admin. */
 function ContactForm() {
@@ -136,6 +190,7 @@ export function ProfilePage() {
             </Card>
           )}
           <ContactForm />
+          <MfaCard />
           <Card>
             <CardHeader>
               <CardTitle>تغيير كلمة المرور</CardTitle>

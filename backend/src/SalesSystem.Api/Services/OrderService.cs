@@ -7,7 +7,7 @@ using SalesSystem.Api.Infrastructure;
 namespace SalesSystem.Api.Services;
 
 public class OrderService(
-    AppDbContext db, ICurrentUser currentUser, AuditService audit, SettingsService settings, EmployeeService employees, BusinessClock clock,
+    AppDbContext db, ICurrentUser currentUser, AuditService audit, SettingsService settings, EmployeeService employees, BusinessClock clock, DailyCloseService dailyClose,
     ILogger<OrderService> logger)
 {
     /// <summary>How far back an employee may date an operation. Admins may record any past date.</summary>
@@ -115,6 +115,7 @@ public class OrderService(
         if (orderType is not { IsActive: true }) throw AppException.BadRequest("نوع الطلب غير صالح أو غير مفعّل");
 
         var operationDate = ValidateOperationDate(req.OperationDate);
+        await dailyClose.EnsureOpenAsync(operationDate, ct);
 
         var serviceIds = req.Items.Select(i => i.ServiceTypeId).Distinct().ToList();
         var services = await db.Services.AsNoTracking().Where(sv => serviceIds.Contains(sv.Id)).ToDictionaryAsync(sv => sv.Id, ct);
@@ -216,6 +217,7 @@ public class OrderService(
     {
         var order = await db.SalesOrders.FirstOrDefaultAsync(o => o.Id == id, ct) ?? throw AppException.NotFound("الطلب غير موجود");
         if (order.Status != OrderStatus.Pending) throw AppException.Conflict("لا يمكن اعتماد هذا الطلب في حالته الحالية");
+        await dailyClose.EnsureOpenAsync(order.OperationDate, ct);
 
         order.Status = OrderStatus.Completed;
         order.CompletedAtUtc = clock.UtcNow;
@@ -232,6 +234,7 @@ public class OrderService(
         var order = await db.SalesOrders.Include(o => o.Payments).Include(o => o.DeductionRecord)
             .FirstOrDefaultAsync(o => o.Id == id, ct) ?? throw AppException.NotFound("الطلب غير موجود");
         if (order.Status == OrderStatus.Cancelled) throw AppException.Conflict("الطلب ملغي مسبقاً");
+        await dailyClose.EnsureOpenAsync(order.OperationDate, ct);
 
         var now = clock.UtcNow;
         var previous = order.Status;

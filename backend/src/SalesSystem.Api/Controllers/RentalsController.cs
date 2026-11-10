@@ -8,7 +8,7 @@ namespace SalesSystem.Api.Controllers;
 
 [ApiController]
 [Route("api/rentals")]
-[Authorize(Roles = RoleNames.SuperAdmin)]
+[Authorize(Roles = RoleNames.RentalStaff)]
 public class RentalsController(RentalService rentals) : ControllerBase
 {
     [HttpGet]

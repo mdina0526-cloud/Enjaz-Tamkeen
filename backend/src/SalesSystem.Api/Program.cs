@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
@@ -6,6 +7,9 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -55,10 +59,18 @@ builder.Services.Configure<AppOptions>(config.GetSection(AppOptions.Section));
 builder.Services.Configure<StorageOptions>(config.GetSection(StorageOptions.Section));
 builder.Services.Configure<SeedOptions>(config.GetSection(SeedOptions.Section));
 var dbOptions = config.GetSection(DatabaseOptions.Section).Get<DatabaseOptions>() ?? new DatabaseOptions();
-// Only the explicit local SQLite recovery command may use a short password.
-if (resetSuperAdmin && (!builder.Environment.IsDevelopment() || !dbOptions.Provider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase)))
-    PasswordService.EnsureStrong(resetAdminPassword!);
+if (resetSuperAdmin) PasswordService.EnsureStrong(resetAdminPassword!);
 var appOptions = config.GetSection(AppOptions.Section).Get<AppOptions>() ?? new AppOptions();
+if (!string.IsNullOrWhiteSpace(appOptions.TrustedProxyIp))
+{
+    if (!IPAddress.TryParse(appOptions.TrustedProxyIp, out var trustedProxy))
+        throw new InvalidOperationException("App:TrustedProxyIp must be a valid IP address.");
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        o.KnownProxies.Add(trustedProxy);
+    });
+}
 
 // ---------- JWT signing key: never in source control ----------
 var jwt = config.GetSection(JwtOptions.Section).Get<JwtOptions>() ?? new JwtOptions();
@@ -86,9 +98,13 @@ else
 
 // ---------- Application services ----------
 builder.Services.AddHttpContextAccessor();
+var dataProtectionPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "keys");
+Directory.CreateDirectory(dataProtectionPath);
+builder.Services.AddDataProtection().SetApplicationName("SalesSystem").PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<BusinessClock>();
 builder.Services.AddSingleton<PasswordService>();
+builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddSingleton<FileStorage>();
 builder.Services.AddSingleton<ReportExporter>();
@@ -103,6 +119,7 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<DbSeeder>();
+builder.Services.AddScoped<DailyCloseService>();
 
 // ---------- Authentication & authorization ----------
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
@@ -155,6 +172,7 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithExposedHeaders("Content-Disposition")));
 
 builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 builder.Services.AddExceptionHandler<AppExceptionHandler>();
 builder.Services.AddControllers().AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
@@ -175,6 +193,7 @@ builder.Services.AddSwaggerGen(c =>
 var app = builder.Build();
 
 app.UseExceptionHandler();
+if (!string.IsNullOrWhiteSpace(appOptions.TrustedProxyIp)) app.UseForwardedHeaders();
 app.Use(async (ctx, next) =>
 {
     ctx.Response.Headers.XContentTypeOptions = "nosniff";
@@ -201,6 +220,8 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();
 
 // ---------- Database bootstrap ----------
 using (var scope = app.Services.CreateScope())
@@ -233,6 +254,9 @@ using (var scope = app.Services.CreateScope())
         user.PasswordHash = scope.ServiceProvider.GetRequiredService<PasswordService>().Hash(user, resetAdminPassword!);
         user.FailedLoginCount = 0;
         user.LockoutEndUtc = null;
+        user.MfaEnabled = false;
+        user.MfaSecretProtected = null;
+        user.MfaLastUsedStep = null;
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await db.SaveChangesAsync();
         Console.WriteLine($"Password reset and lockout cleared for SuperAdmin '{user.Username}'.");

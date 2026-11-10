@@ -8,7 +8,7 @@ namespace SalesSystem.Api.Controllers;
 
 [ApiController]
 [Route("api/orders")]
-[Authorize(Roles = $"{RoleNames.SuperAdmin},{RoleNames.Employee}")]
+[Authorize(Roles = RoleNames.OrderStaff)]
 public class OrdersController(OrderService orders) : ControllerBase
 {
     /// <summary>Admins see all orders; employees only see their own (enforced server-side).</summary>
@@ -32,10 +32,10 @@ public class OrdersController(OrderService orders) : ControllerBase
     }
 
     [HttpPost("{id:int}/approve")]
-    [Authorize(Roles = RoleNames.SuperAdmin)]
+    [Authorize(Roles = RoleNames.Management)]
     public Task<OrderDetailDto> Approve(int id, CancellationToken ct) => orders.ApproveAsync(id, ct);
 
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Roles = RoleNames.SuperAdmin)]
+    [Authorize(Roles = RoleNames.Management)]
     public Task<OrderDetailDto> Cancel(int id, CancelOrderRequest req, CancellationToken ct) => orders.CancelAsync(id, req.Reason, ct);
 }

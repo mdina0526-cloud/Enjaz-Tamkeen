@@ -1,4 +1,4 @@
-export type Role = 'SuperAdmin' | 'Employee'
+export type Role = 'SuperAdmin' | 'Employee' | 'OperationsManager' | 'Accountant'
 export type OrderStatus = 'Pending' | 'Completed' | 'Cancelled'
 export type PaymentMethod = 'Cash' | 'Card'
 export type PaymentStatus = 'Completed' | 'Voided'
@@ -25,6 +25,12 @@ export interface UserInfo {
   employeeCode: string | null
   jobTitle: string | null
   lastLoginAtUtc: string | null
+  mfaEnabled: boolean
+}
+
+export interface MfaSetup {
+  secret: string
+  enrollmentUri: string
 }
 
 export interface LoginResponse {
@@ -48,6 +54,7 @@ export interface EmployeeListItem {
   totalSales: number
   lastLoginAtUtc: string | null
   createdAtUtc: string
+  role: Role
 }
 
 export interface EmployeeDetail {
@@ -65,6 +72,7 @@ export interface EmployeeDetail {
   lastLoginAtUtc: string | null
   createdAtUtc: string
   loginSlug: string | null
+  role: Role
 }
 
 export interface LoginPortal {
